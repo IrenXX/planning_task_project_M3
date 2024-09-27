@@ -26,8 +26,7 @@ public class RepostService {
     private Instant startOfDay;
     private Instant endOfDay;
 
-    @Scheduled(cron = "0 0 0 * * ?")
-//    @Scheduled(cron = "0 */5 * * * *")
+    @Scheduled(cron = "0 0 0 * * ?", zone = "Europe/Moscow")
     public void generateAndSendReports() {
         startOfDay = Instant.now().truncatedTo(ChronoUnit.DAYS).minus(1, ChronoUnit.DAYS);
         endOfDay = startOfDay.plus(1, ChronoUnit.DAYS);
@@ -38,7 +37,7 @@ public class RepostService {
 
     private void processUserReports(Person person) {
         List<Task> tasks = taskRepository.findAllByPerson(person);
-        List<Task> incompleteTasks = filterTasksByStatus(tasks, TaskStatus.NEW);
+        List<Task> incompleteTasks = filterTasksByStatus(tasks);
         List<Task> completedTodayTasks = filterTasksCompletedToday(tasks);
 
         EmailMessageTask emailTask = createEmailTask(person, incompleteTasks, completedTodayTasks);
@@ -47,9 +46,9 @@ public class RepostService {
         }
     }
 
-    private List<Task> filterTasksByStatus(List<Task> tasks, TaskStatus status) {
+    private List<Task> filterTasksByStatus(List<Task> tasks) {
         return tasks.stream()
-                .filter(task -> task.getStatus() == status)
+                .filter(task -> task.getStatus() == TaskStatus.NEW)
                 .collect(Collectors.toList());
     }
 
@@ -67,17 +66,20 @@ public class RepostService {
         String body = null;
 
         if (!incompleteTasks.isEmpty() && !completedTasks.isEmpty()) {
-            subject = "У вас осталось " + incompleteTasks.size() + " несделанных задач и вы выполнили " + completedTasks.size() + " задач";
-            body = "Выполненные задачи:\n" + formatTasks(completedTasks) + "\n\nНесделанные задачи:\n" + formatTasks(incompleteTasks);
+            subject = "У вас осталось выполнить" + incompleteTasks.size() + " задач. Вы выполнили "
+                    + completedTasks.size() + " задач";
+            body = "Выполненные задачи:\n" + formatTasks(completedTasks) + "\n\nНевыполненные задачи:\n"
+                    + formatTasks(incompleteTasks);
         } else if (!incompleteTasks.isEmpty()) {
-            subject = "У вас осталось " + incompleteTasks.size() + " несделанных задач";
-            body = "Несделанные задачи:\n" + formatTasks(incompleteTasks);
+            subject = "У вас осталось выполнить " + incompleteTasks.size() + " задач";
+            body = "Невыполненные задачи:\n" + formatTasks(incompleteTasks);
         } else if (!completedTasks.isEmpty()) {
             subject = "За сегодня вы выполнили " + completedTasks.size() + " задач";
             body = "Выполненные задачи:\n" + formatTasks(completedTasks);
+        } else {
+            return null;
         }
-
-        return (subject != null && body != null) ? new EmailMessageTask(person.getEmail(), subject, body) : null;
+        return new EmailMessageTask(person.getEmail(), subject, body);
     }
 
     private String formatTasks(List<Task> tasks) {
