@@ -18,7 +18,7 @@ public class Task {
 
     @Id
     @GeneratedValue(strategy = GenerationType.IDENTITY)
-    private Long id;
+    private int id;
 
     @CreationTimestamp
     @Column(name = "created", updatable = false)
